@@ -337,7 +337,9 @@ class LocalSyncService {
           a.createdAt.isAtSameMomentAs(b.createdAt) &&
           a.width == b.width &&
           a.height == b.height &&
-          a.durationMs == b.durationMs;
+          a.durationMs == b.durationMs &&
+          // Some OEM cameras rewrite the file in place without touching DATE_MODIFIED
+          a.size == b.size;
     }
 
     final firstAdjustment = a.adjustmentTime?.millisecondsSinceEpoch ?? 0;
@@ -439,6 +441,7 @@ extension PlatformToLocalAsset on PlatformAsset {
     adjustmentTime: tryFromSecondsSinceEpoch(adjustmentTime, isUtc: true),
     latitude: latitude,
     longitude: longitude,
+    size: size,
     isEdited: false,
   );
 }

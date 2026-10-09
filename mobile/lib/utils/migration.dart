@@ -19,6 +19,7 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/feature_message.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/platform_extensions.dart';
+import 'package:immich_mobile/infrastructure/repositories/local_album.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/network.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/models/auth/auxilary_endpoint.model.dart';
@@ -28,7 +29,7 @@ import 'package:immich_mobile/providers/album/album_sort_by_options.provider.dar
 import 'package:immich_mobile/utils/datetime_helpers.dart';
 import 'package:logging/logging.dart';
 
-const int targetVersion = 28;
+const int targetVersion = 29;
 
 Future<void> migrateDatabaseIfNeeded(Drift drift, NativeSyncApi nativeSyncApi, PermissionApi permissionApi) async {
   final int? storedVersion = Store.tryGet(StoreKey.version);
@@ -48,6 +49,11 @@ Future<void> migrateDatabaseIfNeeded(Drift drift, NativeSyncApi nativeSyncApi, P
 
   if (version < 28) {
     await _migrateTo28(drift);
+  }
+
+  if (version < 29 && CurrentPlatform.isAndroid) {
+    // Backfill local_asset_entity.size: the next full sync diffs every asset against MediaStore
+    await LocalAlbumRepository(drift).resetSync();
   }
 
   if (storedVersion == null) {

@@ -136,6 +136,10 @@ class LocalAlbumRepository extends DatabaseAccessor<Drift> with $LocalAlbumRepos
     });
   }
 
+  /// Marks every album as never synced, so the next full sync diffs each asset against the device
+  Future<void> resetSync() =>
+      _db.localAlbumEntity.update().write(LocalAlbumEntityCompanion(updatedAt: Value(DateTime.utc(1))));
+
   Future<void> updateAll(Iterable<LocalAlbum> albums) {
     return _db.transaction(() async {
       await _db.localAlbumEntity.update().write(const LocalAlbumEntityCompanion(marker_: Value(true)));
@@ -331,6 +335,21 @@ class LocalAlbumRepository extends DatabaseAccessor<Drift> with $LocalAlbumRepos
       return Future.value();
     }
 
+    // Reset checksum if the file changed
+    await _db.batch((batch) async {
+      for (final asset in localAssets) {
+        batch.update(
+          _db.localAssetEntity,
+          LocalAssetEntityCompanion.custom(
+            checksum: const Constant(null),
+            // SET reads the existing row, so this keeps the checksum being cleared
+            previousChecksum: coalesce([_db.localAssetEntity.previousChecksum, _db.localAssetEntity.checksum]),
+          ),
+          where: (row) => row.id.equals(asset.id) & _fileChanged(row, asset),
+        );
+      }
+    });
+
     return _db.batch((batch) async {
       for (final asset in localAssets) {
         final companion = LocalAssetEntityCompanion.insert(
@@ -342,27 +361,27 @@ class LocalAlbumRepository extends DatabaseAccessor<Drift> with $LocalAlbumRepos
           height: Value(asset.height),
           durationMs: Value(asset.durationMs),
           id: asset.id,
-          checksum: const Value(null),
           orientation: Value(asset.orientation),
           isFavorite: Value(asset.isFavorite),
           playbackStyle: Value(asset.playbackStyle),
+          size: Value(asset.size),
           groupDate: Value(timelineGroupDate(asset.createdAt.toLocal())),
         );
         batch.insert<$LocalAssetEntityTable, LocalAssetEntityData>(
           _db.localAssetEntity,
-          companion,
-          onConflict: DoUpdate(
-            // SET reads the existing row, so this keeps the checksum being cleared
-            (_) => RawValuesInsertable({
-              ...companion.toColumns(true),
-              'previous_checksum': coalesce([_db.localAssetEntity.previousChecksum, _db.localAssetEntity.checksum]),
-            }),
-            where: (old) => old.updatedAt.isNotValue(asset.updatedAt),
-          ),
+          companion.copyWith(checksum: const Value(null)),
+          onConflict: DoUpdate((_) => companion),
         );
       }
     });
   }
+
+  // Size catches OEM cameras that rewrite the file in place and keep DATE_MODIFIED
+  Expression<bool> _fileChanged($LocalAssetEntityTable row, LocalAsset asset) =>
+      row.updatedAt.isNotValue(asset.updatedAt) |
+      row.size.isNotExp(Variable(asset.size)) |
+      row.width.isNotExp(Variable(asset.width)) |
+      row.height.isNotExp(Variable(asset.height));
 
   Future<void> _removeAssets(String albumId, Iterable<String> assetIds) async {
     if (assetIds.isEmpty) {

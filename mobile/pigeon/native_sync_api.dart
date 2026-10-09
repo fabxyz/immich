@@ -35,6 +35,9 @@ class PlatformAsset {
   final double? latitude;
   final double? longitude;
 
+  // Bytes, Android only
+  final int? size;
+
   final PlatformAssetPlaybackStyle playbackStyle;
 
   const PlatformAsset({
@@ -51,6 +54,7 @@ class PlatformAsset {
     this.adjustmentTime,
     this.latitude,
     this.longitude,
+    this.size,
     this.playbackStyle = PlatformAssetPlaybackStyle.unknown,
   });
 }

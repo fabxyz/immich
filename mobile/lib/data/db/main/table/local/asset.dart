@@ -37,6 +37,9 @@ class LocalAssetEntity extends Table with DriftDefaultsMixin, AssetEntityMixin {
   /// Checksum of the last synced version of this asset
   TextColumn get previousChecksum => text().nullable()();
 
+  /// File size in bytes as reported by MediaStore when the asset was last synced. Android only
+  IntColumn get size => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -59,6 +62,7 @@ extension LocalAssetEntityDataDomainExtension on LocalAssetEntityData {
     adjustmentTime: adjustmentTime,
     latitude: latitude,
     longitude: longitude,
+    size: size,
     cloudId: iCloudId,
     isEdited: false,
   );
